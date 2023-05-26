@@ -1,2 +1,3 @@
 downloads/
 virtual_env
+*.pyc
