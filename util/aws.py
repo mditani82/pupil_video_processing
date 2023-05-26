@@ -7,8 +7,8 @@ from sklearn.model_selection import train_test_split
 
 bucketName = 'pupilengine'
 directory = f'{os.getcwd()}/downloads'
-imagesDataDirectory  = f'{os.getcwd()}/data/images' 
-labelsDataDirectory = f'{os.getcwd()}/data/labels' 
+imagesDataDirectory  = f'{os.getcwd()}/data/images/' 
+labelsDataDirectory = f'{os.getcwd()}/data/labels/' 
 res_height = 1024
 
 def readFileFromS3(filename: str):
@@ -115,12 +115,12 @@ def drawBox(img, bbox):
         cv2.rectangle(img, (x,y), ((x+w), (y+w)), (255,0,255), 3,1)
         cv2.putText(img, "Tracking", (75, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,255), 2)
 
-def splitTrainTest(videoPath, filename, labelIndex):
+def splitTrainTest(videoDirectory, filename, labelIndex):
 
-    foldersValidation(videoPath, filename, labelIndex)
+    foldersValidation(videoDirectory, filename, labelIndex)
     
     # getting list of images
-    dir_list = os.listdir(videoPath)
+    dir_list = os.listdir(videoDirectory)
 
     # replacing the extension
     images = []
@@ -137,23 +137,27 @@ def splitTrainTest(videoPath, filename, labelIndex):
             shutil.move(os.path.join(source_path, _name), destination_path)
         return
 
-    test_dir = videoPath + f'/images/test_{labelIndex}'
-    train_dir = videoPath + f'/images/train_{labelIndex}'
+    test_dir = videoDirectory + f'/images/test_{labelIndex}'
+    train_dir = videoDirectory + f'/images/train_{labelIndex}'
 
-    batch_move_files(train_names, videoPath, train_dir, 'jpg')
-    batch_move_files(test_names, videoPath, test_dir, 'jpg')
+    test_dir_labels = videoDirectory + f'/labels/test_{labelIndex}'
+    train_dir_labels = videoDirectory + f'/labels/train_{labelIndex}'
 
-    test_dir_labels = videoPath + f'/labels/test_{labelIndex}'
-    train_dir_labels = videoPath + f'/labels/train_{labelIndex}'
+    batch_move_files(train_names, videoDirectory, train_dir_labels, 'txt')
+    batch_move_files(test_names, videoDirectory, test_dir_labels, 'txt')
 
-    batch_move_files(train_names, videoPath, train_dir_labels, 'txt')
-    batch_move_files(test_names, videoPath, test_dir_labels, 'txt')
+    batch_move_files(train_names, videoDirectory, train_dir, 'jpg')
+    batch_move_files(test_names, videoDirectory, test_dir, 'jpg')
 
-    shutil.move(train_dir, imagesDataDirectory) 
-    shutil.move(test_dir, imagesDataDirectory) 
+    shutil.move(train_dir, f'{imagesDataDirectory}/train_{labelIndex}') 
+    shutil.move(test_dir, f'{imagesDataDirectory}/test_{labelIndex}') 
 
-    shutil.move(train_dir_labels, labelsDataDirectory) 
-    shutil.move(test_dir_labels, labelsDataDirectory) 
+    shutil.move(train_dir_labels, f'{labelsDataDirectory}/train_{labelIndex}') 
+    shutil.move(test_dir_labels, f'{labelsDataDirectory}/test_{labelIndex}') 
+
+    # Clean content of Directory if exist
+    if  os.path.isdir(videoDirectory):
+        shutil.rmtree(videoDirectory)
 
 def foldersValidation(videoPath, filename, labelIndex):
 
@@ -163,8 +167,7 @@ def foldersValidation(videoPath, filename, labelIndex):
     if not os.path.exists(videoPath + f'/labels/train_{labelIndex}'):
         os.makedirs(videoPath + f'/labels/train_{labelIndex}')
 
-    if not os.path.exists(videoPath):
-        os.makedirs(videoPath)
+
 
     if not os.path.exists(videoPath + f'/images/test_{labelIndex}'):
         os.makedirs(videoPath + f'/images/test_{labelIndex}')
@@ -172,7 +175,7 @@ def foldersValidation(videoPath, filename, labelIndex):
     if not os.path.exists(videoPath + f'/images/train_{labelIndex}'):
         os.makedirs(videoPath + f'/images/train_{labelIndex}')
 
-    pass
+    # pass
 
 def modifyYamlFile():
     pass
