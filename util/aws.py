@@ -123,4 +123,3 @@ def generateTxTFiles(name: str, filename: str, xmin, ymin, xmax, ymax):
         cv2.imwrite(name, img)
                     
         index += 1
-    pass
