@@ -6,7 +6,7 @@ downloadFile = readFileFromS3(filename)
 
 if downloadFile['message'] == 'Success':
     # createImagesFromVideo(filename)
-    processVideo('pods', filename, 309, 654, 759 , 1194, True, '0')
+    processVideo('pods', filename, 309, 654, 759 , 1194, False, '0')
 else:
     print(downloadFile['message'])
     pass

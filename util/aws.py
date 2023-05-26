@@ -1,6 +1,9 @@
+import glob
 import boto3
 import os
 import cv2
+import shutil
+from sklearn.model_selection import train_test_split
 
 bucketName = 'pupilengine'
 directory = f'{os.getcwd()}/downloads'
@@ -87,8 +90,14 @@ def processVideo(name: str, filename: str, xmin, ymin, xmax, ymax, drawPOI, labe
     
     #check if video Directory Exist
     videoDirectory = f'{directory}/{filename[:-4]}'
+    
+    # Clean content of Directory if exist
+    if  os.path.isdir(videoDirectory):
+        shutil.rmtree(videoDirectory)
+    
+    # Create Directory if not exist
     if not os.path.isdir(videoDirectory):
-        os.mkdir(videoDirectory)   
+        os.mkdir(videoDirectory)
 
     cap = cv2.VideoCapture(f'{directory}/{filename}')
     tracker = cv2.TrackerMIL_create()
@@ -122,8 +131,10 @@ def processVideo(name: str, filename: str, xmin, ymin, xmax, ymax, drawPOI, labe
                     
         index += 1
 
-        # if index == 100:
+        # if index == 10:
         #     break
+
+    splitTrainTest(videoDirectory)
 
 def generateTxTfiles(img, bbox, labelIndex, filename, index, videoDirectory):
 
@@ -159,3 +170,40 @@ def drawBox(img, bbox):
         x, y, w, h = int(bbox[0]),  int(bbox[1]),  int(bbox[2]),  int(bbox[3])
         cv2.rectangle(img, (x,y), ((x+w), (y+w)), (255,0,255), 3,1)
         cv2.putText(img, "Tracking", (75, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,255), 2)
+
+def splitTrainTest(videoPath):
+    
+    # getting list of images
+    dir_list = os.listdir(videoPath)
+
+    # replacing the extension
+    images = []
+    for name in dir_list:
+        if name[-3:] == 'jpg':
+            images.append(name)
+
+    # splitting the dataset
+    train_names, test_names = train_test_split(images, test_size=0.3)
+
+    def batch_move_files(file_list, source_path, destination_path):
+        for file in file_list:
+            image = file[:-3] + 'jpg'
+            label = file[:-3] + 'txt'
+            shutil.move(os.path.join(source_path, image), destination_path)
+            shutil.move(os.path.join(source_path, label), destination_path)
+        return
+
+    if not os.path.exists(videoPath):
+        os.makedirs(videoPath)
+
+    if not os.path.exists(videoPath + '/images/test'):
+        os.makedirs(videoPath + '/images/test')
+
+    if not os.path.exists(videoPath + '/images/train'):
+        os.makedirs(videoPath + '/images/train')
+
+    test_dir = videoPath + '/images/test'
+    train_dir = videoPath + '/images/train'
+
+    batch_move_files(train_names, videoPath, train_dir)
+    batch_move_files(test_names, videoPath, test_dir)
