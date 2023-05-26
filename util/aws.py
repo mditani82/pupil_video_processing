@@ -30,7 +30,6 @@ def readFileFromS3(filename: str):
     else:
         return { 'message': 'Bucket Not Found' }
 
-
 def processVideo(name: str, filename: str, xmin, ymin, xmax, ymax, drawPOI, labelIndex):
     
     #check if video Directory Exist
