@@ -9,3 +9,4 @@ virtual_env
 */__pycache__/
 util/__pycache__/
 data/
+runs/

@@ -1,21 +1,35 @@
-import glob
 import boto3
 import os
 import cv2
 import shutil
 from sklearn.model_selection import train_test_split
+import ruamel.yaml
+from ultralytics import YOLO
+from pathlib import Path
 
 bucketName = 'pupilengine'
 directory = f'{os.getcwd()}/downloads'
 imagesDataDirectory  = f'{os.getcwd()}/data/images/' 
-labelsDataDirectory = f'{os.getcwd()}/data/labels/' 
-res_height = 1024
+labelsDataDirectory =  f'{os.getcwd()}/data/labels/' 
+# res_height = 1024
 
 def readFileFromS3(filename: str):
+
+    #check if downloads folder exist
+    if not os.path.isdir(directory):
+        os.mkdir(directory)
+
     file_with_path = f'{directory}/{filename}'
 
+    #check if file is available
     if os.path.isfile(file_with_path):
+        for subdir, dirs, files in os.walk(imagesDataDirectory):
+            if not subdir == imagesDataDirectory:
+                # temp = subdir.replace(imagesDataDirectory[:-7],'')
+                if filename in subdir:
+                    return { 'message': 'Video already processed'}
         return { 'message': 'Success'}
+
 
     s3 = boto3.resource('s3')
     bucket = s3.Bucket(bucketName)
@@ -30,14 +44,19 @@ def readFileFromS3(filename: str):
     else:
         return { 'message': 'Bucket Not Found' }
 
-def processVideo(name: str, filename: str, xmin, ymin, xmax, ymax, drawPOI, labelIndex):
+def processVideo(filename: str, xmin, ymin, xmax, ymax, drawPOI):
     
     #check if video Directory Exist
     videoDirectory = f'{directory}/{filename[:-4]}'
-    
+
+    #delete Data Folder <----------this should be removed.
+    # if  os.path.isdir(videoDirectory):
+    #     shutil.rmtree(videoDirectory)
+
+
     # Clean content of Directory if exist
-    if  os.path.isdir(videoDirectory):
-        shutil.rmtree(videoDirectory)
+    # if  os.path.isdir(imagesDataDirectory[:-8]):
+    #     shutil.rmtree(imagesDataDirectory[:-8])
     
     # Create Directory if not exist
     if not os.path.isdir(videoDirectory):
@@ -66,7 +85,7 @@ def processVideo(name: str, filename: str, xmin, ymin, xmax, ymax, drawPOI, labe
                 cv2.putText(img, "Lost", (75, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
 
         # write txt file
-        if not generateTxTfiles(img, bbox, labelIndex, filename, index, videoDirectory):
+        if not generateTxTfiles(img, bbox, filename, index, videoDirectory):
             break
 
        # write image file
@@ -78,9 +97,22 @@ def processVideo(name: str, filename: str, xmin, ymin, xmax, ymax, drawPOI, labe
         if index == 10:
             break
 
-    splitTrainTest(videoDirectory, filename, labelIndex)
+    splitTrainTest(videoDirectory, filename)
+    modifyYamlFile(filename)
+    # train()
 
-def generateTxTfiles(img, bbox, labelIndex, filename, index, videoDirectory):
+def generateTxTfiles(img, bbox, filename, index, videoDirectory):
+
+
+    labelIndex = 0
+    try:
+        path = Path('data/dataset.yaml')
+        yaml = ruamel.yaml.YAML(typ='safe')
+        data = yaml.load(path)
+        labelIndex = len(data['names'])
+    except:
+        labelIndex = 0
+
 
     try:
         imgWidth = img.shape[1]
@@ -115,9 +147,9 @@ def drawBox(img, bbox):
         cv2.rectangle(img, (x,y), ((x+w), (y+w)), (255,0,255), 3,1)
         cv2.putText(img, "Tracking", (75, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,255), 2)
 
-def splitTrainTest(videoDirectory, filename, labelIndex):
+def splitTrainTest(videoDirectory, filename):
 
-    foldersValidation(videoDirectory, filename, labelIndex)
+    foldersValidation(videoDirectory, filename)
     
     # getting list of images
     dir_list = os.listdir(videoDirectory)
@@ -137,11 +169,11 @@ def splitTrainTest(videoDirectory, filename, labelIndex):
             shutil.move(os.path.join(source_path, _name), destination_path)
         return
 
-    test_dir = videoDirectory + f'/images/test_{labelIndex}'
-    train_dir = videoDirectory + f'/images/train_{labelIndex}'
+    test_dir = videoDirectory + f'/images/test_{filename}'
+    train_dir = videoDirectory + f'/images/train_{filename}'
 
-    test_dir_labels = videoDirectory + f'/labels/test_{labelIndex}'
-    train_dir_labels = videoDirectory + f'/labels/train_{labelIndex}'
+    test_dir_labels = videoDirectory + f'/labels/test_{filename}'
+    train_dir_labels = videoDirectory + f'/labels/train_{filename}'
 
     batch_move_files(train_names, videoDirectory, train_dir_labels, 'txt')
     batch_move_files(test_names, videoDirectory, test_dir_labels, 'txt')
@@ -149,33 +181,89 @@ def splitTrainTest(videoDirectory, filename, labelIndex):
     batch_move_files(train_names, videoDirectory, train_dir, 'jpg')
     batch_move_files(test_names, videoDirectory, test_dir, 'jpg')
 
-    shutil.move(train_dir, f'{imagesDataDirectory}/train_{labelIndex}') 
-    shutil.move(test_dir, f'{imagesDataDirectory}/test_{labelIndex}') 
+    shutil.move(train_dir, f'{imagesDataDirectory}/train_{filename}') 
+    shutil.move(test_dir, f'{imagesDataDirectory}/test_{filename}') 
 
-    shutil.move(train_dir_labels, f'{labelsDataDirectory}/train_{labelIndex}') 
-    shutil.move(test_dir_labels, f'{labelsDataDirectory}/test_{labelIndex}') 
+    shutil.move(train_dir_labels, f'{labelsDataDirectory}/train_{filename}') 
+    shutil.move(test_dir_labels, f'{labelsDataDirectory}/test_{filename}') 
 
     # Clean content of Directory if exist
-    if  os.path.isdir(videoDirectory):
-        shutil.rmtree(videoDirectory)
+    # if  os.path.isdir(videoDirectory):
+    #     shutil.rmtree(videoDirectory)
 
-def foldersValidation(videoPath, filename, labelIndex):
+def foldersValidation(videoPath, filename):
 
-    if not os.path.exists(videoPath + f'/labels/test_{labelIndex}'):
-        os.makedirs(videoPath + f'/labels/test_{labelIndex}')
+    if not os.path.exists(videoPath + f'/labels/test_{filename}'):
+        os.makedirs(videoPath + f'/labels/test_{filename}')
 
-    if not os.path.exists(videoPath + f'/labels/train_{labelIndex}'):
-        os.makedirs(videoPath + f'/labels/train_{labelIndex}')
+    if not os.path.exists(videoPath + f'/labels/train_{filename}'):
+        os.makedirs(videoPath + f'/labels/train_{filename}')
 
+    if not os.path.exists(videoPath + f'/images/test_{filename}'):
+        os.makedirs(videoPath + f'/images/test_{filename}')
 
+    if not os.path.exists(videoPath + f'/images/train_{filename}'):
+        os.makedirs(videoPath + f'/images/train_{filename}')
 
-    if not os.path.exists(videoPath + f'/images/test_{labelIndex}'):
-        os.makedirs(videoPath + f'/images/test_{labelIndex}')
+def modifyYamlFile(filename):
 
-    if not os.path.exists(videoPath + f'/images/train_{labelIndex}'):
-        os.makedirs(videoPath + f'/images/train_{labelIndex}')
+    trainFiles = []
+    for subdir, dirs, files in os.walk(imagesDataDirectory):
+        if not subdir == imagesDataDirectory:
+            temp = subdir.replace(imagesDataDirectory[:-7],'')
+            if 'train' in temp:
+                trainFiles.append(temp)
+    
+    valFiles = []
+    for subdir, dirs, files in os.walk(imagesDataDirectory):
+        if not subdir == imagesDataDirectory:
 
-    # pass
+            temp = subdir.replace(imagesDataDirectory[:-7],'')
+            if 'test' in temp:
+                valFiles.append(temp)
 
-def modifyYamlFile():
-    pass
+    # Names Dictionary
+    names = {}
+    try:
+        path = Path('data/dataset.yaml')
+        yaml = ruamel.yaml.YAML(typ='safe')
+        data = yaml.load(path)
+        len(data['names'])
+        names = data['names']
+        names[len(data['names'])] = filename
+    except:
+        names[0] = filename
+
+    inp = """\
+    path:
+    train:
+        Smith
+    val:
+        Alice
+    test:
+    names:
+    """
+    code = ruamel.yaml.load(inp, ruamel.yaml.RoundTripLoader)
+    
+    code['path'] = imagesDataDirectory[:-7]
+    code['train'] = trainFiles
+    code['val'] = valFiles
+    code['names'] = names
+
+    yaml = ruamel.yaml.YAML()
+
+    with open(r'data/dataset.yaml', 'w') as file:
+        yaml.indent(offset=2)
+        yaml.dump(code, file)
+
+def train():
+    ROOT_DIR = "/Users/moeitani/Desktop/yolo/gentxttracking/data"
+    model = YOLO("yolov8n.yaml")
+    results = model.train(data=os.path.join(ROOT_DIR, "dataset.yaml"), epochs=2)
+    path = model.export(format="onnx")
+    # print(path)
+    
+    # transfer file to s3
+    s3 = boto3.client('s3')
+    with open(path, "rb") as f:
+        s3.upload_fileobj(f, bucketName, 'best.onnx')

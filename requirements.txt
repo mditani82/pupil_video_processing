@@ -2,4 +2,6 @@ boto3
 opencv-python
 scikit-learn
 ultralytics
-pyyaml
+ruamel.yaml
+ultralytics
+fastapi[all]
