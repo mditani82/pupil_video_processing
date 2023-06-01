@@ -3,9 +3,21 @@ from util.aws import readFileFromS3, processVideo, train
 from fastapi import FastAPI
 from pydantic import BaseModel
 import threading
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI()
+
+origin = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origin,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class S3File(BaseModel):
     filename: str
