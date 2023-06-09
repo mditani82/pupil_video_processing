@@ -41,7 +41,7 @@ async def download(item: S3File):
     
     bbox = item.xmin, item.ymin, item.xmax , item.ymax
     
-    processVideo(item.ass_id, videoName, bbox)
+    processVideo(item.ass_id, filename, bbox)
     #processVideo(filename, item.xmin, item.ymin, item.xmax , item.ymax, False)
         # processVideo(filename, 309, 654, 759 , 1194, False)
     # return {"message": downloadFile['message']}
